@@ -51,9 +51,36 @@ header p{font-size:13px;color:#666}
 .threshold-row input[type=range]{flex:1}
 .threshold-row .val{font-size:13px;font-weight:600;min-width:60px;color:#1a1a1a}
 .threshold-note{font-size:11px;color:#888;margin-top:4px}
+.login-screen{position:fixed;inset:0;background:#f5f5f3;display:flex;align-items:center;justify-content:center;z-index:9999}
+.login-card{background:#fff;border:1px solid #e5e5e0;border-radius:14px;padding:2rem;width:100%;max-width:360px}
+.login-card h2{font-size:18px;font-weight:600;margin-bottom:4px}
+.login-card p{font-size:13px;color:#888;margin-bottom:1.5rem}
+.login-field{margin-bottom:1rem}
+.login-field label{display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:5px}
+.login-field input{width:100%;padding:9px 12px;font-size:14px;border:1px solid #d0d0cc;border-radius:8px;outline:none;transition:border .15s}
+.login-field input:focus{border-color:#378ADD}
+.login-btn{width:100%;padding:11px;font-size:14px;font-weight:600;background:#1a1a1a;color:#fff;border:none;border-radius:8px;cursor:pointer;margin-top:.5rem;transition:opacity .15s}
+.login-btn:hover{opacity:.85}
+.login-err{display:none;margin-top:.75rem;padding:.7rem 1rem;background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;font-size:13px;color:#991b1b;text-align:center}
 </style>
 </head>
 <body>
+<div class="login-screen" id="login-screen">
+  <div class="login-card">
+    <h2>抽選処理ツール</h2>
+    <p>ログインしてください</p>
+    <div class="login-field">
+      <label>ログイン名</label>
+      <input type="text" id="login-user" placeholder="ログイン名" autocomplete="username">
+    </div>
+    <div class="login-field">
+      <label>パスワード</label>
+      <input type="password" id="login-pass" placeholder="パスワード" autocomplete="current-password">
+    </div>
+    <div class="login-err" id="login-err">ログイン名またはパスワードが違います</div>
+    <button class="login-btn" onclick="doLogin()">ログイン</button>
+  </div>
+</div>
 <div class="wrap">
   <header>
     <h1>抽選処理ツール</h1>
@@ -336,6 +363,22 @@ async function runProcess() {
 }
 
 document.getElementById('run-btn').addEventListener('click', runProcess);
+
+function doLogin(){
+  const u=document.getElementById('login-user').value;
+  const p=document.getElementById('login-pass').value;
+  if(u==='voreas' && p==='63.f446!h(E3'){
+    document.getElementById('login-screen').style.display='none';
+  } else {
+    const e=document.getElementById('login-err');
+    e.style.display='block';
+    document.getElementById('login-pass').value='';
+  }
+}
+
+document.addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&document.getElementById('login-screen').style.display!=='none')doLogin();
+});
 </script>
 </body>
 </html>
