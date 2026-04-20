@@ -129,6 +129,19 @@ header p{font-size:13px;color:#666}
   <div class="card">
     <div class="card-header">
       <span class="step-badge">4</span>
+      <div class="card-title">26-27シーズン 全チケットデータ（.xlsx・任意）</div>
+    </div>
+    <div class="drop-area" id="drop-2627">
+      <input type="file" id="inp-2627" accept=".xlsx">
+      <div class="drop-icon">📊</div>
+      <div class="drop-label">26-27シーズンの購入者一覧レポート（省略可）</div>
+    </div>
+    <div class="file-list" id="list-2627"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <span class="step-badge">5</span>
       <div class="card-title">当選ハードルの設定</div>
     </div>
     <div class="threshold-row">
@@ -139,12 +152,16 @@ header p{font-size:13px;color:#666}
       <label>25-26：<span id="lbl-2526">0</span>回以下</label>
       <input type="range" id="thr-2526" min="0" max="5" step="1" value="0" oninput="document.getElementById('lbl-2526').textContent=this.value;updateNote()">
     </div>
-    <div class="threshold-note" id="thr-note">→ 両シーズンとも0回の人のみ当選（デフォルト）</div>
+    <div class="threshold-row">
+      <label>26-27：<span id="lbl-2627">0</span>回以下</label>
+      <input type="range" id="thr-2627" min="0" max="5" step="1" value="0" oninput="document.getElementById('lbl-2627').textContent=this.value;updateNote()">
+    </div>
+    <div class="threshold-note" id="thr-note">→ 全シーズン0回の人のみ当選（デフォルト）</div>
   </div>
 
   <div class="card">
     <div class="card-header">
-      <span class="step-badge">5</span>
+      <span class="step-badge">6</span>
       <div class="card-title">当選枠の設定（乱数抽選）</div>
     </div>
     <div class="threshold-row">
@@ -171,24 +188,33 @@ header p{font-size:13px;color:#666}
 </div>
 
 <script>
-const files = {lottery:[], '2425':null, '2526':null};
+const files = {lottery:[], '2425':null, '2526':null, '2627':null};
 let outputWB = null;
 
 function updateNote() {
   const v1 = document.getElementById('thr-2425').value;
   const v2 = document.getElementById('thr-2526').value;
+  const v3 = document.getElementById('thr-2627').value;
   const n = document.getElementById('thr-note');
-  if(v1==='0'&&v2==='0') n.textContent='→ 両シーズンとも0回の人のみ当選（デフォルト）';
-  else n.textContent='→ 24-25が'+v1+'回以下、かつ25-26が'+v2+'回以下の人が当選';
+  const has2627 = files['2627'] !== null;
+  if(v1==='0'&&v2==='0'&&(!has2627||v3==='0')){
+    n.textContent = has2627 ? '→ 全シーズン0回の人のみ当選' : '→ 両シーズンとも0回の人のみ当選（デフォルト）';
+  } else {
+    let txt = '→ 24-25が'+v1+'回以下、かつ25-26が'+v2+'回以下';
+    if(has2627) txt += '、かつ26-27が'+v3+'回以下';
+    txt += 'の人が当選';
+    n.textContent = txt;
+  }
 }
 
 // ファイル入力イベント
 document.getElementById('inp-lottery').addEventListener('change', e => addFiles('lottery', e.target.files));
 document.getElementById('inp-2425').addEventListener('change', e => addFiles('2425', e.target.files));
 document.getElementById('inp-2526').addEventListener('change', e => addFiles('2526', e.target.files));
+document.getElementById('inp-2627').addEventListener('change', e => addFiles('2627', e.target.files));
 
 // ドラッグ&ドロップ
-['lottery','2425','2526'].forEach(key => {
+['lottery','2425','2526','2627'].forEach(key => {
   const el = document.getElementById('drop-'+key);
   el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('dragover'); });
   el.addEventListener('dragleave', () => el.classList.remove('dragover'));
@@ -307,16 +333,26 @@ async function runProcess() {
 
     log('25-26シーズンデータを読み込み中...', 55);
     const t2526 = await readXLSX(files['2526']);
-    log(`　→ ${t2526.length}件`, 65);
+    log(`　→ ${t2526.length}件`, 62);
 
-    log('メールアドレス照合・当落判定中...', 70);
-    const cnt2425 = {}, cnt2526 = {};
+    const cnt2425 = {}, cnt2526 = {}, cnt2627 = {};
     t2425.forEach(r => { const e = String(r['Customer Email']||'').toLowerCase(); if(e) cnt2425[e] = (cnt2425[e]||0)+1; });
     t2526.forEach(r => { const e = String(r['Customer Email']||'').toLowerCase(); if(e) cnt2526[e] = (cnt2526[e]||0)+1; });
 
+    if (files['2627']) {
+      log('26-27シーズンデータを読み込み中...', 66);
+      const t2627 = await readXLSX(files['2627']);
+      t2627.forEach(r => { const e = String(r['Customer Email']||'').toLowerCase(); if(e) cnt2627[e] = (cnt2627[e]||0)+1; });
+      log(`　→ ${t2627.length}件`, 70);
+    }
+
+    log('メールアドレス照合・当落判定中...', 72);
     const thr2425 = Number(document.getElementById('thr-2425').value);
     const thr2526 = Number(document.getElementById('thr-2526').value);
-    log(`　→ 当選基準：24-25が${thr2425}回以下 かつ 25-26が${thr2526}回以下`, 68);
+    const thr2627 = Number(document.getElementById('thr-2627').value);
+    let thrMsg = `24-25が${thr2425}回以下 かつ 25-26が${thr2526}回以下`;
+    if (files['2627']) thrMsg += ` かつ 26-27が${thr2627}回以下`;
+    log(`　→ 当選基準：${thrMsg}`, 74);
 
     // 条件チェック
     const eligible = [];
@@ -325,8 +361,10 @@ async function runProcess() {
       const email = String(r['eメール']||'').toLowerCase();
       const c2425 = cnt2425[email] || 0;
       const c2526 = cnt2526[email] || 0;
-      const obj = {...r, '24-25': c2425, '25-26': c2526};
-      if (c2425 <= thr2425 && c2526 <= thr2526) eligible.push(obj);
+      const c2627 = cnt2627[email] || 0;
+      const obj = {...r, '24-25': c2425, '25-26': c2526, ...(files['2627'] ? {'26-27': c2627} : {})};
+      const pass2627 = !files['2627'] || c2627 <= thr2627;
+      if (c2425 <= thr2425 && c2526 <= thr2526 && pass2627) eligible.push(obj);
       else ineligible.push(obj);
     });
     log(`　→ 条件クリア: ${eligible.length}件 / 条件外: ${ineligible.length}件`, 75);
@@ -369,7 +407,7 @@ async function runProcess() {
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.json_to_sheet(outRows);
     const colKeys = Object.keys(outRows[0]);
-    const widths = {'登録NO':10,'対応状況':10,'登録日時':20,'更新日時':20,'登録方法':10,'登録者':10,'友だちNO':10,'姓':8,'名':10,'性別':6,'生年月日':14,'郵便番号':10,'住所':35,'マンション等':20,'eメール':28,'観戦希望日':28,'24-25':10,'25-26':10,'当落':8,'観戦希望日(数字)':14};
+    const widths = {'登録NO':10,'対応状況':10,'登録日時':20,'更新日時':20,'登録方法':10,'登録者':10,'友だちNO':10,'姓':8,'名':10,'性別':6,'生年月日':14,'郵便番号':10,'住所':35,'マンション等':20,'eメール':28,'観戦希望日':28,'24-25':10,'25-26':10,'26-27':10,'当落':8,'観戦希望日(数字)':14};
     ws['!cols'] = colKeys.map(k => ({wch: widths[k]||15}));
 
     // 游ゴシック設定
