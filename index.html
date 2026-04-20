@@ -142,6 +142,19 @@ header p{font-size:13px;color:#666}
     <div class="threshold-note" id="thr-note">→ 両シーズンとも0回の人のみ当選（デフォルト）</div>
   </div>
 
+  <div class="card">
+    <div class="card-header">
+      <span class="step-badge">5</span>
+      <div class="card-title">当選枠の設定（乱数抽選）</div>
+    </div>
+    <div class="threshold-row">
+      <label style="min-width:160px">当選枠の人数</label>
+      <input type="number" id="quota-input" min="1" placeholder="例：100" style="width:120px;padding:7px 10px;font-size:14px;border:1px solid #d0d0cc;border-radius:8px;outline:none">
+      <span style="font-size:13px;color:#888">名</span>
+    </div>
+    <div class="threshold-note">→ 空欄の場合、条件を満たした全員が当選になります</div>
+  </div>
+
   <button class="run-btn" id="run-btn" disabled>実行する</button>
 
   <div class="progress" id="progress">
@@ -305,21 +318,51 @@ async function runProcess() {
     const thr2526 = Number(document.getElementById('thr-2526').value);
     log(`　→ 当選基準：24-25が${thr2425}回以下 かつ 25-26が${thr2526}回以下`, 68);
 
-    let won = 0, lost = 0;
-    const outRows = lotteryRows.map(r => {
+    // 条件チェック
+    const eligible = [];
+    const ineligible = [];
+    lotteryRows.forEach(r => {
       const email = String(r['eメール']||'').toLowerCase();
       const c2425 = cnt2425[email] || 0;
       const c2526 = cnt2526[email] || 0;
-      const result = (c2425 <= thr2425 && c2526 <= thr2526) ? '当選' : '落選';
-      if (result === '当選') won++; else lost++;
-      return {
-        ...r,
-        '24-25': c2425,
-        '25-26': c2526,
-        '当落': result,
-        '観戦希望日(数字)': result === '当選' ? convertDate(r['観戦希望日']) : ''
-      };
+      const obj = {...r, '24-25': c2425, '25-26': c2526};
+      if (c2425 <= thr2425 && c2526 <= thr2526) eligible.push(obj);
+      else ineligible.push(obj);
     });
+    log(`　→ 条件クリア: ${eligible.length}件 / 条件外: ${ineligible.length}件`, 75);
+
+    // 乱数抽選
+    const quotaVal = document.getElementById('quota-input').value;
+    const quota = quotaVal === '' ? null : Math.max(1, parseInt(quotaVal));
+    let wonSet;
+    if (quota === null || quota >= eligible.length) {
+      wonSet = new Set(eligible.map((_, i) => i));
+      if (quota !== null) log(`　→ 当選枠(${quota}名) >= 条件クリア者(${eligible.length}名)のため全員当選`, 80);
+      else log(`　→ 当選枠未設定のため条件クリア者全員当選`, 80);
+    } else {
+      // Fisher-Yates シャッフルで quota 人を選ぶ
+      const idx = Array.from({length: eligible.length}, (_, i) => i);
+      for (let i = idx.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [idx[i], idx[j]] = [idx[j], idx[i]];
+      }
+      wonSet = new Set(idx.slice(0, quota));
+      log(`　→ ${eligible.length}名の中から${quota}名を乱数抽選`, 80);
+    }
+
+    let won = 0, lost = 0;
+    const outRows = [];
+    eligible.forEach((r, i) => {
+      const result = wonSet.has(i) ? '当選' : '落選';
+      if (result === '当選') won++; else lost++;
+      outRows.push({...r, '当落': result, '観戦希望日(数字)': result === '当選' ? convertDate(r['観戦希望日']) : ''});
+    });
+    ineligible.forEach(r => {
+      lost++;
+      outRows.push({...r, '当落': '落選', '観戦希望日(数字)': ''});
+    });
+    // 登録NO順に並び直す
+    outRows.sort((a, b) => Number(a['登録NO']) - Number(b['登録NO']));
     log(`　→ 当選: ${won}件 / 落選: ${lost}件`, 85);
 
     log('Excelファイルを生成中...', 92);
@@ -350,8 +393,10 @@ async function runProcess() {
 
     document.getElementById('stats-grid').innerHTML = `
       <div class="stat"><div class="n">${lotteryRows.length}</div><div class="l">総件数</div></div>
+      <div class="stat"><div class="n" style="color:#378ADD">${eligible.length}</div><div class="l">条件クリア</div></div>
       <div class="stat"><div class="n won-n">${won}</div><div class="l">当選</div></div>
       <div class="stat"><div class="n lost-n">${lost}</div><div class="l">落選</div></div>`;
+    document.getElementById('stats-grid').style.gridTemplateColumns='repeat(4,1fr)';
     document.getElementById('result-box').style.display = 'block';
     document.getElementById('dl-btn').onclick = () => XLSX.writeFile(outputWB, '抽選回答データ_当落判定.xlsx');
 
